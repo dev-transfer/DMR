@@ -1,0 +1,750 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DMR Tools</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --red: #C0392B;
+  --red-dark: #96281B;
+  --green: #1D9E75;
+  --green-light: #E1F5EE;
+  --green-dark: #0F6E56;
+  --bg: #f5f5f3;
+  --white: #ffffff;
+  --border: #e0e0e0;
+  --text: #1a1a1a;
+  --muted: #888;
+}
+body {
+  font-family: 'Segoe UI', Tahoma, sans-serif;
+  background: var(--bg); color: var(--text);
+  min-height: 100vh; padding: 2rem 1rem;
+  display: flex; justify-content: center;
+}
+.app { width: 100%; max-width: 1200px; }
+
+.app-header {
+  background: var(--red);
+  border-radius: 12px;
+  padding: 1.25rem 1.75rem;
+  margin-bottom: 1.5rem;
+}
+.app-header h1 { color: #fff; font-size: 24px; font-weight: 700; margin-bottom: 2px; }
+.app-header .subtitle { color: rgba(255,255,255,0.75); margin-bottom: 0; font-size: 13px; }
+
+.tabs { display: flex; gap: 0; margin-bottom: 1.5rem; border-bottom: 1.5px solid var(--border); position: relative; z-index: 10; }
+.tab-btn {
+  padding: 8px 20px; font-size: 14px; font-family: inherit;
+  border: none; background: none; cursor: pointer; color: var(--muted);
+  border-bottom: 2px solid transparent; margin-bottom: -1.5px; transition: color 0.15s;
+}
+.tab-btn:hover { color: var(--text); }
+.tab-btn.active { color: #111; font-weight: 600; border-bottom-color: var(--green); }
+.tab-panel { display: none; }
+.tab-panel.active { display: block; }
+
+.saved-banner {
+  display: flex; align-items: center; gap: 10px;
+  background: var(--green-light); border: 0.5px solid #9FE1CB;
+  border-radius: 10px; padding: 10px 14px;
+  margin-bottom: 1rem; font-size: 13px; color: var(--green-dark);
+}
+.banner-btn { font-size: 12px; font-weight: 600; cursor: pointer; border-radius: 6px; padding: 3px 10px; font-family: inherit; }
+.banner-btn.primary { color: var(--green-dark); border: 0.5px solid var(--green); background: #fff; margin-left: auto; }
+.banner-btn.primary:hover { background: var(--green-light); }
+.banner-btn.secondary { color: var(--muted); border: 0.5px solid var(--border); background: #fff; margin-left: 4px; }
+
+.section {
+  background: var(--white); border: 0.5px solid var(--border);
+  border-radius: 12px; padding: 1rem 1.25rem; margin-bottom: 1rem;
+}
+.section-title {
+  font-size: 13px; font-weight: 600; color: #444;
+  margin-bottom: 10px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+}
+.badge-count { font-size: 11px; font-weight: 600; background: var(--green-light); color: var(--green-dark); padding: 1px 7px; border-radius: 99px; }
+.btn-row { display: flex; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
+.pick-btn {
+  display: flex; align-items: center; gap: 6px;
+  padding: 7px 13px; border-radius: 8px;
+  border: 1px solid var(--border); background: var(--white);
+  cursor: pointer; font-size: 13px; font-family: inherit; color: var(--text);
+}
+.pick-btn:hover { background: #f0f0ee; }
+.action-btn {
+  display: flex; align-items: center; gap: 6px;
+  padding: 7px 13px; border-radius: 8px;
+  border: 1px solid var(--border); background: var(--white);
+  cursor: pointer; font-size: 13px; font-family: inherit; color: var(--text);
+}
+.action-btn.green { border-color: var(--green); color: var(--green-dark); }
+.action-btn.green:hover { background: var(--green-light); }
+.action-btn.red { border-color: #E24B4A; color: #A32D2D; }
+.action-btn.red:hover { background: #fff5f5; }
+
+.progress-wrap { display: none; margin: 8px 0; }
+.progress-bar-bg { height: 5px; border-radius: 99px; background: #e8e8e6; overflow: hidden; }
+.progress-bar-fill { height: 100%; border-radius: 99px; background: var(--green); width: 0%; transition: width 0.12s; }
+.progress-label { font-size: 12px; color: var(--muted); margin-top: 3px; }
+
+.file-list { display: flex; flex-direction: column; gap: 4px; max-height: 140px; overflow-y: auto; }
+.file-chip {
+  display: flex; align-items: center; gap: 8px;
+  background: #f9f9f7; border: 0.5px solid #e8e8e6;
+  border-radius: 7px; padding: 6px 10px; font-size: 12px;
+}
+.file-chip .fn { flex: 1; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.file-chip .fc { color: var(--muted); white-space: nowrap; }
+
+.storage-row {
+  display: none; align-items: center; gap: 8px;
+  font-size: 12px; color: var(--muted); margin-top: 8px;
+  padding: 6px 10px; background: #f9f9f7;
+  border: 0.5px solid #e8e8e6; border-radius: 7px;
+}
+.dot { width: 7px; height: 7px; border-radius: 50%; background: #ccc; flex-shrink: 0; }
+.dot.saved { background: var(--green); }
+.storage-row .info { flex: 1; }
+.save-now { font-size: 12px; color: #185FA5; cursor: pointer; border: none; background: none; font-family: inherit; }
+.save-now:hover { text-decoration: underline; }
+
+.summary-toolbar { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
+.summary-toolbar .info-text { font-size: 13px; color: #666; flex: 1; }
+.tbl-wrap { overflow-x: auto; border-radius: 8px; border: 0.5px solid var(--border); }
+table { width: 100%; border-collapse: collapse; font-size: 12px; }
+thead tr { background: #f5f5f3; }
+th { padding: 9px 10px; text-align: left; font-weight: 600; color: #555; border-bottom: 0.5px solid var(--border); white-space: nowrap; }
+th.group-hd { text-align: center; background: #f0f0ee; border-bottom: 0.5px solid #ddd; font-size: 12px; border-left: 1px solid var(--border); color: #555; }
+td { padding: 7px 10px; border-bottom: 0.5px solid #f0f0ee; vertical-align: top; }
+td.grp-border { border-left: 1px solid #e8e8e6; }
+tr:last-child td { border-bottom: none; }
+tr:hover td { background: #fafaf8; }
+
+.mono { font-family: 'Courier New', monospace; font-weight: 600; font-size: 11px; color: #185FA5; }
+.doc-name { color: #222; font-size: 12px; }
+.doc-name.notfound { color: #bbb; font-style: italic; }
+.na-val { color: var(--muted); font-size: 12px; font-style: italic; }
+.empty-val { color: #ddd; font-size: 11px; }
+.multi-entry { display: flex; flex-direction: column; gap: 5px; }
+.entry-line { display: flex; flex-direction: column; gap: 1px; padding-bottom: 5px; border-bottom: 0.5px dashed #f0f0ee; }
+.entry-line:last-child { border-bottom: none; padding-bottom: 0; }
+.process-name { font-size: 12px; color: #333; font-weight: 500; }
+.row-num { color: var(--muted); font-size: 11px; }
+.src-file { font-size: 11px; color: var(--muted); max-width: 140px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
+.badge { display: inline-block; font-size: 10px; font-weight: 600; padding: 1px 6px; border-radius: 99px; }
+.badge-found { background: var(--green-light); color: var(--green-dark); }
+.badge-notfound { background: #feecec; color: #A32D2D; }
+.badge-na { background: #f0f0ee; color: var(--muted); }
+.empty-state { text-align: center; padding: 2.5rem; color: var(--muted); font-size: 14px; }
+
+.search-label { font-size: 13px; color: #666; margin-bottom: 6px; }
+.search-row { display: flex; gap: 8px; }
+.search-row input {
+  flex: 1; height: 38px; border-radius: 8px;
+  border: 1px solid var(--border); padding: 0 12px;
+  font-size: 14px; font-family: 'Courier New', monospace;
+  background: var(--white); color: var(--text); outline: none;
+}
+.search-row input:focus { border-color: #378ADD; }
+.search-row button {
+  padding: 0 18px; height: 38px; border-radius: 8px;
+  border: 1px solid var(--border); background: var(--white); color: var(--text);
+  cursor: pointer; font-size: 14px; font-family: inherit;
+}
+.search-row button:hover { background: #f0f0ee; }
+.hint { font-size: 12px; color: var(--muted); margin-top: 5px; }
+.result-box { margin-top: 1rem; display: flex; flex-direction: column; gap: 8px; }
+.result-card { background: var(--white); border: 0.5px solid #ddd; border-radius: 12px; padding: 1rem 1.25rem; }
+.result-found { border-left: 3px solid var(--green); }
+.result-not-found { border-left: 3px solid #ccc; }
+.result-meta { font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+.result-docno { font-size: 14px; font-weight: 600; font-family: 'Courier New', monospace; margin-bottom: 4px; }
+.result-name { font-size: 17px; font-weight: 600; color: #111; line-height: 1.4; }
+.result-source { font-size: 12px; color: var(--muted); margin-top: 6px; }
+.result-empty { font-size: 14px; color: var(--muted); }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="app-header">
+    <h1>DMR Tools</h1>
+    <div class="subtitle">Document Management & Review</div>
+  </div>
+
+  <div id="fetchBanner" style="display:none" class="saved-banner" style="background:#e8f4fd; border-color:#90caf9; color:#1565c0;">
+    <span>🌐</span>
+    <span>โหลดจาก db.json — <strong id="fetchCount"></strong></span>
+    <button class="banner-btn secondary" onclick="document.getElementById('fetchBanner').style.display='none'">✕</button>
+  </div>
+
+  <div id="savedBanner" style="display:none" class="saved-banner">
+    <span>💾</span>
+    <span id="savedText"></span>
+    <button class="banner-btn primary" onclick="loadFromStorage()">โหลดข้อมูลเดิม</button>
+    <button class="banner-btn secondary" onclick="document.getElementById('savedBanner').style.display='none'">ไม่ใช้</button>
+  </div>
+
+  <div class="tabs">
+    <button class="tab-btn active" onclick="switchTab('db')">🗄️ ฐานข้อมูล</button>
+    <button class="tab-btn" onclick="switchTab('scan')">🔍 สแกนไฟล์งาน</button>
+    <button class="tab-btn" onclick="switchTab('search')">📄 ค้นหารายตัว</button>
+  </div>
+
+  <!-- TAB DB -->
+  <div class="tab-panel active" id="tab-db">
+    <div class="section">
+      <div class="section-title">
+        ไฟล์ฐานข้อมูล (Document No. → Document Name)
+        <span class="badge-count" id="dbCount">0 รายการ</span>
+      </div>
+      <div class="btn-row">
+        <button class="pick-btn" onclick="document.getElementById('dbFolderInput').click()">🗂️ เลือกโฟลเดอร์</button>
+        <button class="pick-btn" onclick="document.getElementById('dbFileInput').click()">📄 เลือกไฟล์</button>
+        <button class="action-btn green" onclick="exportDBJson()">⬇️ Export db.json</button>
+        <button class="action-btn red" onclick="clearDB()">✕ ล้าง</button>
+      </div>
+      <input type="file" id="dbFolderInput" webkitdirectory multiple accept=".xlsx,.xls" style="display:none">
+      <input type="file" id="dbFileInput" accept=".xlsx,.xls" multiple style="display:none">
+      <div class="progress-wrap" id="dbProgress">
+        <div class="progress-bar-bg"><div class="progress-bar-fill" id="dbProgressBar"></div></div>
+        <div class="progress-label" id="dbProgressLabel"></div>
+      </div>
+      <div class="file-list" id="dbFileList"></div>
+      <div class="storage-row" id="storageRow">
+        <div class="dot" id="storageDot"></div>
+        <span class="info" id="storageInfo"></span>
+        <button class="save-now" onclick="saveToStorage()">บันทึกตอนนี้</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB SCAN -->
+  <div class="tab-panel" id="tab-scan">
+    <div class="section">
+      <div class="section-title">ไฟล์งาน (สแกนแถวที่มี SOP No. / Specification No. / Format No.)</div>
+      <div class="btn-row">
+        <button class="pick-btn" onclick="document.getElementById('workFileInput').click()">📄 เลือกไฟล์</button>
+        <button class="action-btn red" onclick="clearWork()">✕ ล้าง</button>
+      </div>
+      <input type="file" id="workFileInput" accept=".xlsx,.xls" multiple style="display:none">
+      <div class="progress-wrap" id="workProgress">
+        <div class="progress-bar-bg"><div class="progress-bar-fill" id="workProgressBar"></div></div>
+        <div class="progress-label" id="workProgressLabel"></div>
+      </div>
+      <div class="file-list" id="workFileList"></div>
+    </div>
+
+    <div class="section">
+      <div class="summary-toolbar">
+        <span class="info-text" id="summaryInfo">—</span>
+        <button class="action-btn green" onclick="exportExcel()">⬇️ Export Excel</button>
+      </div>
+      <div class="tbl-wrap">
+        <table id="summaryTable">
+          <thead>
+            <tr>
+              <th rowspan="2" style="vertical-align:middle;">#</th>
+              <th rowspan="2" style="vertical-align:middle;">Process Name</th>
+              <th colspan="2" class="group-hd">SOP No.</th>
+              <th colspan="2" class="group-hd">Specification No.</th>
+              <th colspan="2" class="group-hd">Format No.</th>
+            </tr>
+            <tr>
+              <th class="group-hd" style="font-size:11px;font-weight:400;border-left:1px solid #e0e0e0;">Document No.</th>
+              <th class="group-hd" style="font-size:11px;font-weight:400;">Document Name</th>
+              <th class="group-hd" style="font-size:11px;font-weight:400;border-left:1px solid #e0e0e0;">Document No.</th>
+              <th class="group-hd" style="font-size:11px;font-weight:400;">Document Name</th>
+              <th class="group-hd" style="font-size:11px;font-weight:400;border-left:1px solid #e0e0e0;">Document No.</th>
+              <th class="group-hd" style="font-size:11px;font-weight:400;">Document Name</th>
+            </tr>
+          </thead>
+          <tbody id="summaryBody">
+            <tr><td colspan="8" class="empty-state">อัปโหลดไฟล์งานเพื่อสแกนเอกสาร</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB SEARCH -->
+  <div class="tab-panel" id="tab-search">
+    <div class="section">
+      <div class="search-label">กรอกหมายเลขเอกสาร (Document No.)</div>
+      <div class="search-row">
+        <input type="text" id="searchInput" placeholder="เช่น ATT-0001" onkeydown="if(event.key==='Enter') doSearch()">
+        <button onclick="doSearch()">ค้นหา</button>
+      </div>
+      <div class="hint" id="searchHint"></div>
+      <div class="result-box" id="resultBox"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const STORAGE_KEY = 'dmrTools_v2';
+let dbData = [];
+let dbFileMap = {};
+let storageSaved = false;
+let scanRows = [];
+
+// ---- TABS ----
+function switchTab(name) {
+  const names = ['db','scan','search'];
+  document.querySelectorAll('.tab-btn').forEach((b,i) => b.classList.toggle('active', names[i]===name));
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.getElementById('tab-'+name).classList.add('active');
+}
+
+// ---- DB ----
+document.getElementById('dbFolderInput').addEventListener('change', e => {
+  loadDBFiles(Array.from(e.target.files).filter(f=>f.name.match(/\.(xlsx|xls)$/i)));
+  e.target.value='';
+});
+document.getElementById('dbFileInput').addEventListener('change', e => {
+  loadDBFiles(Array.from(e.target.files).filter(f=>f.name.match(/\.(xlsx|xls)$/i)));
+  e.target.value='';
+});
+
+function loadDBFiles(files) {
+  if (!files.length) return;
+  let done=0; const total=files.length;
+  showProg('dbProgress','dbProgressBar','dbProgressLabel',0,total);
+  files.forEach(file => {
+    readArr(file, buf => {
+      try {
+        const wb = XLSX.read(buf,{type:'array'});
+        let rows=[];
+        // Read first sheet only
+        const firstSheet = wb.SheetNames[0];
+        const data=XLSX.utils.sheet_to_json(wb.Sheets[firstSheet],{header:1,defval:''});
+        let docNameCol=1, headerFound=false;
+        for(let ri=0;ri<Math.min(data.length,20);ri++){
+          const row=data[ri];
+          const colALow=String(row[0]||'').toLowerCase().trim();
+          if(colALow==='document no.'||colALow==='format no.'){
+            row.forEach((cell,ci)=>{
+              if(String(cell||'').toLowerCase().trim()==='document name') docNameCol=ci;
+            });
+            headerFound=true;
+            for(let di=ri+1;di<data.length;di++){
+              const dr=data[di];
+              const a=String(dr[0]||'').trim().replace(/\s+/g,' ');
+              const b=String(dr[docNameCol]||'').trim().replace(/\s+/g,' ');
+              if(!a||!b) continue; // skip blanks
+              // skip rows containing 'cancel' or page-header keywords
+              const rowText=dr.map(c=>String(c||'')).join(' ').toLowerCase();
+              if(rowText.includes('cancel')) continue;
+              const skipKw=['item code','item name','customer','check list','issue date','document no.','page'];
+              if(skipKw.some(k=>rowText.includes(k))) continue;
+              rows.push({docNo:a, docName:b, source:file.name});
+            }
+            break;
+          }
+        }
+        if(!headerFound){
+          data.forEach(row=>{
+            const a=String(row[0]||'').trim().replace(/\s+/g,' ');
+            const b=String(row[1]||'').trim().replace(/\s+/g,' ');
+            if(!a||!b) return;
+            if(a.toLowerCase()==='document no.'||b.toLowerCase()==='document name') return;
+            const rowText=row.map(c=>String(c||'')).join(' ').toLowerCase();
+            if(rowText.includes('cancel')) return;
+            const skipKw=['item code','item name','customer','check list','issue date','document no.','page'];
+            if(skipKw.some(k=>rowText.includes(k))) return;
+            rows.push({docNo:a, docName:b, source:file.name});
+          });
+        }
+        dbFileMap[file.name]=rows.length;
+        dbData=dbData.filter(r=>r.source!==file.name).concat(rows);
+      } catch(e){ dbFileMap[file.name]=0; }
+      done++;
+      showProg('dbProgress','dbProgressBar','dbProgressLabel',done,total);
+      if(done===total){
+        setTimeout(()=>hideProg('dbProgress'),500);
+        saveToStorage(); renderDBList(); updateDBCount(); updateStorageRow(); rebuildSummary();
+      }
+    });
+  });
+}
+function renderDBList(){
+  document.getElementById('dbFileList').innerHTML=Object.entries(dbFileMap).map(([n,c])=>
+    `<div class="file-chip"><span>📄</span><span class="fn" title="${n}">${n}</span><span class="fc">${c} รายการ</span></div>`
+  ).join('');
+}
+function updateDBCount(){
+  document.getElementById('dbCount').textContent=dbData.length+' รายการ';
+  document.getElementById('searchHint').textContent=dbData.length?'ฐานข้อมูล '+dbData.length+' รายการ':'';
+}
+function clearDB(){
+  if(!confirm('ล้างฐานข้อมูลและลบข้อมูลที่บันทึกไว้?'))return;
+  dbData=[];dbFileMap={};storageSaved=false;
+  localStorage.removeItem(STORAGE_KEY);
+  renderDBList();updateDBCount();updateStorageRow();rebuildSummary();
+}
+
+// ---- WORK FILES ----
+let workFileMap={};
+const SOP_KW   = ['sop no','sop no.'];
+const SPEC_KW  = ['specification no','specification no.','spec no','spec no.'];
+const FMT_KW   = ['format no','format no.'];
+const PROC_KW  = ['process name','process'];
+const DOC_PAT  = /[A-Za-z]{1,5}-\d{3,6}/g;
+
+function detectColType(h){
+  const t=String(h||'').toLowerCase().trim();
+  if(SOP_KW.some(k=>t===k||t.startsWith(k))) return 'sop';
+  if(SPEC_KW.some(k=>t===k||t.startsWith(k))) return 'spec';
+  if(FMT_KW.some(k=>t===k||t.startsWith(k))) return 'fmt';
+  if(PROC_KW.some(k=>t===k||t.startsWith(k))) return 'proc';
+  return null;
+}
+
+// Parse cell: return array of doc nos, or ['N/A'], or []
+function parseCellNos(cellVal){
+  const s = String(cellVal||'').trim();
+  if(!s || s==='-') return [];
+  if(s.toUpperCase()==='N/A') return ['N/A'];
+  const matches = s.match(DOC_PAT);
+  if(matches && matches.length) return [...new Set(matches)];
+  return [];
+}
+
+document.getElementById('workFileInput').addEventListener('change', e=>{
+  loadWorkFiles(Array.from(e.target.files).filter(f=>f.name.match(/\.(xlsx|xls)$/i)));
+  e.target.value='';
+});
+
+function loadWorkFiles(files){
+  if(!files.length)return;
+  let done=0; const total=files.length;
+  showProg('workProgress','workProgressBar','workProgressLabel',0,total);
+  files.forEach(file=>{
+    readArr(file, buf=>{
+      try{
+        const wb=XLSX.read(buf,{type:'array'});
+        scanRows=scanRows.filter(r=>r.fileName!==file.name);
+        let fileRowCount=0;
+        wb.SheetNames.forEach(sn=>{
+          const data=XLSX.utils.sheet_to_json(wb.Sheets[sn],{header:1,defval:''});
+          let sopCol=-1, specCol=-1, fmtCol=-1, procCol=-1, headerRowIdx=-1;
+          for(let ri=0;ri<Math.min(data.length,30);ri++){
+            const row=data[ri];
+            let found=false;
+            row.forEach((cell,ci)=>{
+              const t=detectColType(cell);
+              if(t==='sop'&&sopCol<0){sopCol=ci;found=true;}
+              if(t==='spec'&&specCol<0){specCol=ci;found=true;}
+              if(t==='fmt'&&fmtCol<0){fmtCol=ci;found=true;}
+              if(t==='proc'&&procCol<0){procCol=ci;}
+            });
+            if(found){headerRowIdx=ri;break;}
+          }
+          if(headerRowIdx<0)return;
+
+          // Track last seen process name for merged/blank cells
+          let lastProcName='';
+          // Keywords that indicate a page-header row to skip
+          const PAGE_KW=['item code','item name','customer','check list','issue date','document no.','page'];
+
+          for(let ri=headerRowIdx+1;ri<data.length;ri++){
+            const row=data[ri];
+            const rowText=row.map(c=>String(c||'')).join(' ').toLowerCase();
+
+            // Skip page-break header rows
+            if(PAGE_KW.some(k=>rowText.includes(k))) continue;
+
+            // Re-detect if we hit a repeated column header row mid-file
+            let isReHeader=false;
+            row.forEach((cell,ci)=>{
+              const t=detectColType(cell);
+              if(t==='sop'){sopCol=ci;isReHeader=true;}
+              if(t==='spec'){specCol=ci;isReHeader=true;}
+              if(t==='fmt'){fmtCol=ci;isReHeader=true;}
+              if(t==='proc'){procCol=ci;}
+            });
+            if(isReHeader) continue; // skip header row itself
+
+            const sopNos  = sopCol>=0  ? parseCellNos(row[sopCol])  : [];
+            const specNos = specCol>=0 ? parseCellNos(row[specCol]) : [];
+            const fmtNos  = fmtCol>=0  ? parseCellNos(row[fmtCol])  : [];
+            if(!sopNos.length && !specNos.length && !fmtNos.length) continue;
+
+            // Skip rows with 'cancel'
+            if(rowText.includes('cancel')) continue;
+
+            // Process name: use current cell or fallback to last seen
+            const rawProc = procCol>=0 ? String(row[procCol]||'').trim() : '';
+            if(rawProc) lastProcName=rawProc;
+
+            scanRows.push({rowIdx:ri, fileName:file.name, sheetName:sn, procName:lastProcName, sopNos, specNos, fmtNos});
+            fileRowCount++;
+          }
+        });
+        workFileMap[file.name]=fileRowCount;
+      }catch(e){workFileMap[file.name]=0;}
+      done++;
+      showProg('workProgress','workProgressBar','workProgressLabel',done,total);
+      if(done===total){
+        setTimeout(()=>hideProg('workProgress'),500);
+        renderWorkList(); rebuildSummary();
+      }
+    });
+  });
+}
+function renderWorkList(){
+  document.getElementById('workFileList').innerHTML=Object.entries(workFileMap).map(([n,c])=>
+    `<div class="file-chip"><span>📄</span><span class="fn" title="${n}">${n}</span><span class="fc">${c} แถว</span></div>`
+  ).join('');
+}
+function clearWork(){ workFileMap={}; scanRows=[]; renderWorkList(); rebuildSummary(); }
+
+// ---- LOOKUP ----
+function lookupName(no){
+  if(!no||no==='N/A') return null;
+  const r=dbData.find(d=>d.docNo.toUpperCase()===no.toUpperCase());
+  return r?r.docName:null;
+}
+
+// Render a group cell (td pair) for a list of doc nos
+function groupCellHtml(nos, isFirst){
+  const borderStyle = isFirst ? '' : 'border-left:1px solid #e8e8e6;';
+  if(!nos||!nos.length){
+    return `<td style="${borderStyle}" class="empty-val">—</td><td class="empty-val">—</td>`;
+  }
+  if(nos.length===1&&nos[0]==='N/A'){
+    return `<td style="${borderStyle}"><span class="na-val">N/A</span></td><td><span class="na-val">N/A</span></td>`;
+  }
+  const entries = nos.map(no=>{
+    const name=lookupName(no);
+    return `<div class="entry-line">
+      <span class="mono">${no}</span>
+    </div>`;
+  }).join('');
+  const names = nos.map(no=>{
+    if(no==='N/A') return `<div class="entry-line"><span class="na-val">N/A</span></div>`;
+    const name=lookupName(no);
+    return `<div class="entry-line">
+      <span class="doc-name${name?'':' notfound'}">${name||'ไม่พบในฐานข้อมูล'}</span>
+    </div>`;
+  }).join('');
+  return `<td style="${borderStyle}"><div class="multi-entry">${entries}</div></td><td><div class="multi-entry">${names}</div></td>`;
+}
+
+function rebuildSummary(){
+  const tbody=document.getElementById('summaryBody');
+  const infoEl=document.getElementById('summaryInfo');
+  if(!scanRows.length){
+    tbody.innerHTML='<tr><td colspan="8" class="empty-state">อัปโหลดไฟล์งานเพื่อสแกนเอกสาร</td></tr>';
+    infoEl.textContent='—'; return;
+  }
+  let totalNos=0, foundNos=0;
+  tbody.innerHTML=scanRows.map((r,i)=>{
+    [...r.sopNos,...r.specNos,...r.fmtNos].forEach(no=>{
+      if(no&&no!=='N/A'){totalNos++;if(lookupName(no))foundNos++;}
+    });
+    const procCell=r.procName
+      ?`<span class="process-name">${r.procName}</span>`
+      :`<span class="row-num">แถว ${r.rowIdx}</span>`;
+    return `<tr>
+      <td class="row-num">${i+1}</td>
+      <td>${procCell}</td>
+      ${groupCellHtml(r.sopNos, true)}
+      ${groupCellHtml(r.specNos, false)}
+      ${groupCellHtml(r.fmtNos, false)}
+    </tr>`;
+  }).join('');
+  infoEl.textContent=`${scanRows.length} แถว — เลขเอกสาร ${totalNos} รายการ จับคู่ได้ ${foundNos} / ไม่พบ ${totalNos-foundNos}`;
+}
+
+// ---- EXPORT ----
+function exportExcel(){
+  if(!scanRows.length){alert('ไม่มีข้อมูลสรุป');return;}
+
+  const wb = XLSX.utils.book_new();
+  const ws = {};
+  const merges = [];
+
+  // Header row 1 (group headers)
+  const H1 = ['#','Process Name','SOP No.','','Specification No.','','Format No.',''];
+  // Header row 2 (sub headers)
+  const H2 = ['','','Document No.','Document Name','Document No.','Document Name','Document No.','Document Name'];
+
+  const headerStyle = { font:{bold:true}, alignment:{horizontal:'center',vertical:'center',wrapText:true} };
+
+  // Write headers at row 0 and 1
+  H1.forEach((v,c)=>{ ws[XLSX.utils.encode_cell({r:0,c})]={v, t:'s'}; });
+  H2.forEach((v,c)=>{ ws[XLSX.utils.encode_cell({r:1,c})]={v, t:'s'}; });
+
+  // Merge group header cells
+  // #: A1:A2, Process Name: B1:B2
+  merges.push({s:{r:0,c:0},e:{r:1,c:0}});
+  merges.push({s:{r:0,c:1},e:{r:1,c:1}});
+  // SOP: C1:D1, Spec: E1:F1, Format: G1:H1
+  merges.push({s:{r:0,c:2},e:{r:0,c:3}});
+  merges.push({s:{r:0,c:4},e:{r:0,c:5}});
+  merges.push({s:{r:0,c:6},e:{r:0,c:7}});
+
+  let rowIdx = 2;
+
+  scanRows.forEach((r,i)=>{
+    const formatNos = (nos) => {
+      if(!nos||!nos.length) return ['',''];
+      if(nos[0]==='N/A') return ['N/A','N/A'];
+      const noStr = nos.join('\n');
+      const nameStr = nos.map(n=>lookupName(n)||'ไม่พบ').join('\n');
+      return [noStr, nameStr];
+    };
+
+    const [sopNo, sopName]   = formatNos(r.sopNos);
+    const [specNo, specName] = formatNos(r.specNos);
+    const [fmtNo, fmtName]   = formatNos(r.fmtNos);
+
+    const rowData = [i+1, r.procName, sopNo, sopName, specNo, specName, fmtNo, fmtName];
+    rowData.forEach((v,c)=>{
+      ws[XLSX.utils.encode_cell({r:rowIdx,c})] = {
+        v: v===null||v===undefined?'':v,
+        t: typeof v==='number'?'n':'s'
+      };
+    });
+    rowIdx++;
+  });
+
+  ws['!ref'] = XLSX.utils.encode_range({s:{r:0,c:0}, e:{r:rowIdx-1,c:7}});
+  ws['!merges'] = merges;
+  ws['!cols'] = [{wch:4},{wch:26},{wch:14},{wch:36},{wch:16},{wch:36},{wch:14},{wch:36}];
+  // Row heights for header
+  ws['!rows'] = [{hpt:20},{hpt:20}];
+
+  XLSX.utils.book_append_sheet(wb, ws, 'DMR Summary');
+  XLSX.writeFile(wb,'DMR_summary.xlsx');
+}
+
+// ---- SINGLE SEARCH ----
+function doSearch(){
+  const query=document.getElementById('searchInput').value.trim().toUpperCase();
+  const box=document.getElementById('resultBox');
+  if(!query){box.innerHTML='';return;}
+  if(!dbData.length){
+    box.innerHTML='<div class="result-card"><div class="result-empty">กรุณาโหลดฐานข้อมูลก่อน</div></div>';return;
+  }
+  const matches=dbData.filter(r=>r.docNo.toUpperCase()===query);
+  if(!matches.length){
+    box.innerHTML='<div class="result-card result-not-found"><div class="result-meta">ผลการค้นหา</div>'+
+      '<div class="result-docno">'+query+' <span class="badge badge-notfound">ไม่พบ</span></div>'+
+      '<div class="result-empty" style="margin-top:4px;">ไม่พบในฐานข้อมูล</div></div>';return;
+  }
+  box.innerHTML=matches.map(m=>
+    '<div class="result-card result-found">'+
+    '<div class="result-meta">พบเอกสาร <span class="badge badge-found">พบ</span></div>'+
+    '<div class="result-docno">'+m.docNo+'</div>'+
+    '<div class="result-name">'+m.docName+'</div>'+
+    '<div class="result-source">จากไฟล์: '+m.source+'</div></div>'
+  ).join('');
+}
+
+// ---- STORAGE ----
+function saveToStorage(){
+  try{
+    // Save only docNo + docName, no source field
+    const slim=dbData.map(r=>({n:r.docNo,d:r.docName}));
+    localStorage.setItem(STORAGE_KEY,JSON.stringify({dbData:slim,dbFileMap,savedAt:new Date().toISOString()}));
+    storageSaved=true;
+    updateStorageRow();
+  }catch(e){
+    storageSaved=false;
+    updateStorageRow();
+  }
+}
+function loadFromStorage(){
+  try{
+    const raw=localStorage.getItem(STORAGE_KEY);
+    if(!raw)return;
+    const p=JSON.parse(raw);
+    // Support both old format {docNo,docName} and new slim {n,d}
+    dbData=(p.dbData||[]).map(r=>r.n?{docNo:r.n,docName:r.d,source:''}:r);
+    dbFileMap=p.dbFileMap||{};storageSaved=true;
+    document.getElementById('savedBanner').style.display='none';
+    renderDBList();updateDBCount();updateStorageRow();rebuildSummary();
+  }catch(e){alert('ไม่สามารถโหลดได้');}
+}
+function updateStorageRow(){
+  const row=document.getElementById('storageRow');
+  if(!dbData.length){row.style.display='none';return;}
+  row.style.display='flex';
+  document.getElementById('storageDot').className='dot'+(storageSaved?' saved':'');
+  if(storageSaved){
+    const raw=localStorage.getItem('dmrTools_v2');
+    const kb=raw?Math.round(raw.length/1024):0;
+    document.getElementById('storageInfo').textContent='บันทึกแล้ว ('+kb+' KB) — เปิดใหม่ข้อมูลยังอยู่';
+  } else {
+    document.getElementById('storageInfo').textContent='ข้อมูลใหญ่เกิน 5MB ต้องโหลดใหม่ทุกครั้ง';
+  }
+}
+
+// ---- UTILS ----
+function readArr(file,cb){const r=new FileReader();r.onload=e=>cb(e.target.result);r.readAsArrayBuffer(file);}
+function showProg(wId,bId,lId,done,total){
+  document.getElementById(wId).style.display='block';
+  document.getElementById(bId).style.width=Math.round(done/total*100)+'%';
+  document.getElementById(lId).textContent=done<total?`กำลังโหลด ${done}/${total} ไฟล์...`:`โหลดแล้ว ${done}/${total} ไฟล์`;
+}
+function hideProg(wId){document.getElementById(wId).style.display='none';}
+
+// ---- EXPORT DB JSON ----
+function exportDBJson(){
+  if(!dbData.length){alert('ไม่มีข้อมูลฐานข้อมูล');return;}
+  const slim=dbData.map(r=>({n:r.docNo,d:r.docName}));
+  const json=JSON.stringify({dbData:slim,exportedAt:new Date().toISOString()},null,2);
+  const blob=new Blob([json],{type:'application/json'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='db.json';
+  a.click();
+}
+
+// ---- AUTO FETCH db.json (GitHub Pages) ----
+async function tryFetchDB(){
+  // Only fetch if no data loaded yet
+  if(dbData.length>0) return;
+  try{
+    const res=await fetch('db.json',{cache:'no-cache'});
+    if(!res.ok) return;
+    const p=await res.json();
+    if(!p.dbData||!p.dbData.length) return;
+    dbData=(p.dbData).map(r=>r.n?{docNo:r.n,docName:r.d,source:'db.json'}:r);
+    dbFileMap={'db.json':dbData.length};
+    storageSaved=false;
+    renderDBList();updateDBCount();updateStorageRow();rebuildSummary();
+    // Show fetch banner
+    const banner=document.getElementById('fetchBanner');
+    if(banner){
+      document.getElementById('fetchCount').textContent=dbData.length+' รายการ';
+      banner.style.display='flex';
+    }
+  }catch(e){/* no db.json, skip */}
+}
+
+// ---- INIT ----
+(function(){
+  try{
+    const raw=localStorage.getItem(STORAGE_KEY);
+    if(!raw)return;
+    const p=JSON.parse(raw);
+    if(!p.dbData||!p.dbData.length)return;
+    const d=new Date(p.savedAt);
+    const ds=d.toLocaleDateString('th-TH',{day:'numeric',month:'short',year:'numeric'})+' '+
+             d.toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit'});
+    document.getElementById('savedText').innerHTML=
+      `<strong>${p.dbData.length} รายการ (${Object.keys(p.dbFileMap).length} ไฟล์)</strong> — บันทึกเมื่อ ${ds}`;
+    document.getElementById('savedBanner').style.display='flex';
+  }catch(e){}
+  // Try to load db.json from GitHub Pages
+  tryFetchDB();
+})();
+</script>
+</body>
+</html>
